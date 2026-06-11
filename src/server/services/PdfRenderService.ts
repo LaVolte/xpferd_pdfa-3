@@ -285,6 +285,11 @@ export class PdfRenderService {
           this.drawSimpleText(page, block, KLEINUNTERNEHMER_NOTE, pdfY, fontSize, color, font);
         }
         break;
+      case 'seller-legal':
+        if (invoice.seller.legalRegistration?.trim()) {
+          this.drawSimpleText(page, block, invoice.seller.legalRegistration.trim(), pdfY, fontSize, color, font);
+        }
+        break;
     }
   }
 

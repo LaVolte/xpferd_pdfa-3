@@ -374,6 +374,7 @@ const deDe = {
   'pdf_builder.gruppe_sonstiges': 'Sonstiges',
   'pdf_builder.block_verkaeufer': 'Verkäufer',
   'pdf_builder.block_kaeufer': 'Käufer',
+  'pdf_builder.block_impressum': 'Impressum (BT-33)',
   'pdf_builder.block_titel': 'Titel',
   'pdf_builder.block_rechnungsnr': 'Rechnungsnr.',
   'pdf_builder.block_datum': 'Datum',

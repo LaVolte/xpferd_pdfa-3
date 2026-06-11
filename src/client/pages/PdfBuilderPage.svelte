@@ -180,6 +180,7 @@
       { key: 'addresses', label: t('pdf_builder.gruppe_adressen'), items: [
         { type: 'seller-address', label: t('pdf_builder.block_verkaeufer'), icon: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8', defaultW: 220, defaultH: 105 },
         { type: 'buyer-address', label: t('pdf_builder.block_kaeufer'), icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2|M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8|M23 21v-2a4 4 0 0 0-3-3.87|M16 3.13a4 4 0 0 1 0 7.75', defaultW: 220, defaultH: 70 },
+        { type: 'seller-legal', label: t('pdf_builder.block_impressum'), icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z|M14 2v6h6|M16 13H8|M16 17H8|M10 9H8', defaultW: 500, defaultH: 18 },
       ]},
       { key: 'header', label: t('pdf_builder.gruppe_kopfdaten'), items: [
         { type: 'invoice-title', label: t('pdf_builder.block_titel'), icon: 'M4 7V4h16v3|M9 20h6|M12 4v16', defaultW: 100, defaultH: 22 },
@@ -1640,6 +1641,8 @@
                     <div>{previewInvoice.seller.postalCode} {previewInvoice.seller.city}</div>
                     {#if previewInvoice.seller.vatId}<div class={isLeft ? '' : 'preview-kv-row'}>{#if isLeft}{t('pdf.ust_idnr')} {previewInvoice.seller.vatId}{:else}<span>{t('pdf.ust_idnr')}</span><span>{previewInvoice.seller.vatId}</span>{/if}</div>{/if}
                     {#if previewInvoice.seller.taxNumber}<div class={isLeft ? '' : 'preview-kv-row'}>{#if isLeft}{t('pdf.steuernr')} {previewInvoice.seller.taxNumber}{:else}<span>{t('pdf.steuernr')}</span><span>{previewInvoice.seller.taxNumber}</span>{/if}</div>{/if}
+                  {:else if block.type === 'seller-legal'}
+                    <div>{previewInvoice.seller.legalRegistration || 'GF: Max Muster | HRB 12345 Amtsgericht Berlin | Sitz: Berlin'}</div>
                   {:else if block.type === 'buyer-address'}
                     <div>{previewInvoice.buyer.name}</div>
                     <div>{previewInvoice.buyer.street}</div>

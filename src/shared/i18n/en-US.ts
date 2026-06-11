@@ -374,6 +374,7 @@ const enUs = {
   'pdf_builder.gruppe_sonstiges': 'Other',
   'pdf_builder.block_verkaeufer': 'Seller',
   'pdf_builder.block_kaeufer': 'Buyer',
+  'pdf_builder.block_impressum': 'Legal Notice (BT-33)',
   'pdf_builder.block_titel': 'Title',
   'pdf_builder.block_rechnungsnr': 'Invoice No.',
   'pdf_builder.block_datum': 'Date',
