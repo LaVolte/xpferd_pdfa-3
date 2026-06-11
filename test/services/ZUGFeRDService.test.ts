@@ -135,9 +135,9 @@ describe('ZUGFeRD — embedded XML file', () => {
     expect(decoded).toBe(xmlString);
   });
 
-  it('MIME type is application/xml', () => {
+  it('MIME type is text/xml', () => {
     const info = pdf.getAttachments().get('factur-x.xml');
-    expect(info?.mimeType).toContain('application/xml');
+    expect(info?.mimeType).toContain('text/xml');
   });
 });
 
@@ -221,8 +221,8 @@ describe('ZUGFeRD — XMP metadata in catalog', () => {
     expect(xmpText).toContain('<fx:ConformanceLevel>XRECHNUNG</fx:ConformanceLevel>');
   });
 
-  it('declares ZUGFeRD version 2.3', () => {
-    expect(xmpText).toContain('<fx:Version>2.3</fx:Version>');
+  it('declares ZUGFeRD version 2.3.1', () => {
+    expect(xmpText).toContain('<fx:Version>2.3.1</fx:Version>');
   });
 
   it('declares document file name factur-x.xml', () => {

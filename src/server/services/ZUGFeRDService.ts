@@ -38,8 +38,8 @@ export class ZUGFeRDService {
 
     // 1. Attach the XML file
     pdf.addAttachment(ATTACHMENT_NAME, xmlBytes, {
-      mimeType: 'application/xml',
-      description: 'XRechnung UBL 2.1 Invoice',
+      mimeType: 'text/xml',
+      description: 'Factur-X CII Invoice XML',
     });
 
     // 2. Set AFRelationship on the FileSpec dict, add /AF to catalog, and fix
@@ -74,7 +74,7 @@ export class ZUGFeRDService {
           const newEfStream = PdfStream.fromDict(
             {
               Type: PdfName.of('EmbeddedFile'),
-              Subtype: PdfName.of('application/xml'),
+              Subtype: PdfName.of('text/xml'),
             },
             xmlBytes,
           );
@@ -174,7 +174,7 @@ export class ZUGFeRDService {
       `        xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">\n` +
       `      <fx:DocumentFileName>${ATTACHMENT_NAME}</fx:DocumentFileName>\n` +
       `      <fx:DocumentType>INVOICE</fx:DocumentType>\n` +
-      `      <fx:Version>2.3</fx:Version>\n` +
+      `      <fx:Version>2.3.1</fx:Version>\n` +
       `      <fx:ConformanceLevel>XRECHNUNG</fx:ConformanceLevel>\n` +
       `    </rdf:Description>\n` +
 
