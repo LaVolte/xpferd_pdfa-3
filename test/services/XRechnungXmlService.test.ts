@@ -50,11 +50,10 @@ describe('XRechnungXmlService — CII format', () => {
     expect(xml).toContain('xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"');
   });
 
-  it('contains Factur-X XRECHNUNG customization ID', () => {
+  it('contains XRechnung 2.3 customization ID (BT-24)', () => {
     const xml = service.generate(sampleInvoice());
     expect(xml).toContain(
-      'urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3' +
-      '#conformant#urn:factur-x.eu:1p0:xrechnung',
+      'urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3',
     );
   });
 

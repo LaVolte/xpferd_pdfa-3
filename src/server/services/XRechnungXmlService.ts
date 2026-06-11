@@ -8,13 +8,11 @@ import { KLEINUNTERNEHMER_NOTE } from '../../shared/constants/index.js';
  *
  * Syntax: UN/CEFACT Cross Industry Invoice 100
  * Profile: urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3
- *          #conformant#urn:factur-x.eu:1p0:xrechnung
  * Attachment filename: factur-x.xml (required by Factur-X spec §6)
  */
 export class XRechnungXmlService {
   private static readonly CUSTOMIZATION_ID =
-    'urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3' +
-    '#conformant#urn:factur-x.eu:1p0:xrechnung';
+    'urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3';
 
   generate(invoice: InvoiceDto): string {
     const root = create({ version: '1.0', encoding: 'UTF-8' })

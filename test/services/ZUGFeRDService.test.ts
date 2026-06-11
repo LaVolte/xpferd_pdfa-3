@@ -316,9 +316,8 @@ describe('XRechnung XML — structure and required elements', () => {
     expect(xmlString).toContain('rsm:CrossIndustryInvoice');
   });
 
-  it('contains Factur-X XRECHNUNG CII customization ID', () => {
+  it('contains XRechnung 2.3 customization ID (BT-24)', () => {
     expect(xmlString).toContain('urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3');
-    expect(xmlString).toContain('urn:factur-x.eu:1p0:xrechnung');
   });
 
   it('is well-formed CII (CrossIndustryInvoice root)', () => {
