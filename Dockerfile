@@ -20,7 +20,7 @@ RUN node build-client.js
 RUN npx tsc -p tsconfig.server.json
 
 # Prune to production deps (native addons already compiled)
-RUN CI=true pnpm prune --prod
+RUN CI=true pnpm prune --prod --ignore-scripts
 
 # Production stage
 FROM node:24-alpine AS production
