@@ -39,6 +39,10 @@
     );
     if (match) {
       selectedPartyId = String(match.id);
+      // Sync fields that may have been added after the invoice was saved
+      if (isSeller && match.legalRegistration && !party.legalRegistration) {
+        party.legalRegistration = match.legalRegistration;
+      }
     }
   });
 
