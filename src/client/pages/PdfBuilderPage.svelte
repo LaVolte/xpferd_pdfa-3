@@ -302,15 +302,20 @@
     }
   }
 
+  function zugferdFilename(invoiceNumber: string): string {
+    return `${invoiceNumber.replace(/[/\\?%*:|"<>]/g, '-')}-ZUGFeRD.pdf`;
+  }
+
   async function downloadPdfFromList(templateId: number, invoiceId: number) {
     listGenerating = { ...listGenerating, [templateId]: true };
     listGenError = '';
     try {
+      const inv = listInvoices.find(i => i.id === invoiceId);
       const blob = await pdfTemplateApi.exportZugferd(templateId, invoiceId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rechnung-ZUGFeRD-${invoiceId}.pdf`;
+      a.download = zugferdFilename(inv?.invoiceNumber ?? String(invoiceId));
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
@@ -996,11 +1001,12 @@
     zugferdExporting = true;
     editorError = '';
     try {
+      const inv = invoices.find(i => i.id === selectedInvoiceId);
       const blob = await pdfTemplateApi.exportZugferd(template.id, selectedInvoiceId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rechnung-ZUGFeRD.pdf`;
+      a.download = zugferdFilename(inv?.invoiceNumber ?? String(selectedInvoiceId));
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
