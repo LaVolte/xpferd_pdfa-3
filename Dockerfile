@@ -19,8 +19,9 @@ COPY . .
 RUN node build-client.js
 RUN npx tsc -p tsconfig.server.json
 
-# Prune to production deps (native addons already compiled)
-RUN CI=true pnpm prune --prod --ignore-scripts
+# Prune to production deps, then recompile better-sqlite3 native addon
+# (pnpm prune re-links from the content-addressable store, wiping the compiled .node file)
+RUN CI=true pnpm prune --prod --ignore-scripts && pnpm rebuild better-sqlite3
 
 # Production stage
 FROM node:24-alpine AS production
