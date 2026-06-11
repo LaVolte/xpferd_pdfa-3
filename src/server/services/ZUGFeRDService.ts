@@ -74,7 +74,7 @@ export class ZUGFeRDService {
           const newEfStream = PdfStream.fromDict(
             {
               Type: PdfName.of('EmbeddedFile'),
-              Subtype: PdfName.of('application#2Fxml'),
+              Subtype: PdfName.of('application/xml'),
             },
             xmlBytes,
           );
