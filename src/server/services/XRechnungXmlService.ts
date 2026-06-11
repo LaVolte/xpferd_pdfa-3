@@ -24,8 +24,10 @@ export class XRechnungXmlService {
       });
 
     // ── 1. ExchangedDocumentContext ───────────────────────────────────────────
-    root.ele('rsm:ExchangedDocumentContext')
-      .ele('ram:GuidelineSpecifiedDocumentContextParameter')
+    const docCtx = root.ele('rsm:ExchangedDocumentContext');
+    docCtx.ele('ram:BusinessProcessSpecifiedDocumentContextParameter')
+      .ele('ram:ID').txt('urn:fdc:peppol.eu:2017:poacc:billing:01:1.0');
+    docCtx.ele('ram:GuidelineSpecifiedDocumentContextParameter')
       .ele('ram:ID').txt(XRechnungXmlService.CUSTOMIZATION_ID);
 
     // ── 2. ExchangedDocument (header) ─────────────────────────────────────────
