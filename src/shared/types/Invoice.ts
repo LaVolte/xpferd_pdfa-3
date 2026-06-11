@@ -12,6 +12,7 @@ export interface PartyDto {
   contactPhone?: string;
   contactEmail?: string;
   email?: string;
+  legalRegistration?: string;
 }
 
 export interface SellerDto {
@@ -25,6 +26,7 @@ export interface SellerDto {
   contactName?: string;            // BT-41
   contactPhone?: string;           // BT-42
   contactEmail?: string;           // BT-43
+  legalRegistration?: string;      // BT-33 (e.g. "GF: Max Muster | HRB 12345 Berlin")
 }
 
 export interface BuyerDto {

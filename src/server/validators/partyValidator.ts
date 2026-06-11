@@ -14,6 +14,7 @@ export const partySchema = z.object({
   contactPhone: z.string().optional().or(z.literal('')),
   contactEmail: z.string().optional().or(z.literal('')),
   email: z.string().optional().or(z.literal('')),
+  legalRegistration: z.string().optional().or(z.literal('')),
 }).refine(
   (data) => data.countryCode !== 'DE' || /^\d{5}$/.test(data.postalCode),
   { message: 'Deutsche PLZ muss 5 Ziffern haben', path: ['postalCode'] },

@@ -22,6 +22,7 @@ interface InvoiceRow {
   seller_contact_name: string | null;
   seller_contact_phone: string | null;
   seller_contact_email: string | null;
+  seller_legal_registration: string | null;
   buyer_name: string;
   buyer_street: string;
   buyer_city: string;
@@ -88,18 +89,18 @@ export class InvoiceModel {
         invoice_number, invoice_date, invoice_type_code, currency_code, due_date, buyer_reference,
         note, delivery_date, order_reference, contract_reference,
         seller_name, seller_street, seller_city, seller_postal_code, seller_country_code,
-        seller_vat_id, seller_tax_number, seller_contact_name, seller_contact_phone, seller_contact_email,
+        seller_vat_id, seller_tax_number, seller_contact_name, seller_contact_phone, seller_contact_email, seller_legal_registration,
         buyer_name, buyer_street, buyer_city, buyer_postal_code, buyer_country_code, buyer_vat_id, buyer_email,
         payment_means_code, payment_terms, iban, bic, payment_reference, account_name,
         tax_category_code, tax_rate, kleinunternehmer,
         total_net_amount, total_tax_amount, total_gross_amount, amount_due, prepaid_amount,
         auto_generated
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       dto.invoiceNumber, dto.invoiceDate, dto.invoiceTypeCode, dto.currencyCode, dto.dueDate ?? null, dto.buyerReference ?? '',
       dto.note ?? null, dto.deliveryDate ?? null, dto.orderReference ?? null, dto.contractReference ?? null,
       dto.seller.name, dto.seller.street, dto.seller.city, dto.seller.postalCode, dto.seller.countryCode,
-      dto.seller.vatId ?? null, dto.seller.taxNumber ?? null, dto.seller.contactName ?? null, dto.seller.contactPhone ?? null, dto.seller.contactEmail ?? null,
+      dto.seller.vatId ?? null, dto.seller.taxNumber ?? null, dto.seller.contactName ?? null, dto.seller.contactPhone ?? null, dto.seller.contactEmail ?? null, dto.seller.legalRegistration ?? null,
       dto.buyer.name, dto.buyer.street, dto.buyer.city, dto.buyer.postalCode, dto.buyer.countryCode, dto.buyer.vatId ?? null, dto.buyer.email ?? null,
       dto.paymentMeansCode, dto.paymentTerms ?? null, dto.iban ?? null, dto.bic ?? null, dto.paymentReference ?? null, dto.accountName ?? null,
       dto.taxCategoryCode, dto.taxRate, dto.kleinunternehmer ? 1 : 0,
@@ -124,7 +125,7 @@ export class InvoiceModel {
         invoice_number = ?, invoice_date = ?, invoice_type_code = ?, currency_code = ?, due_date = ?, buyer_reference = ?,
         note = ?, delivery_date = ?, order_reference = ?, contract_reference = ?,
         seller_name = ?, seller_street = ?, seller_city = ?, seller_postal_code = ?, seller_country_code = ?,
-        seller_vat_id = ?, seller_tax_number = ?, seller_contact_name = ?, seller_contact_phone = ?, seller_contact_email = ?,
+        seller_vat_id = ?, seller_tax_number = ?, seller_contact_name = ?, seller_contact_phone = ?, seller_contact_email = ?, seller_legal_registration = ?,
         buyer_name = ?, buyer_street = ?, buyer_city = ?, buyer_postal_code = ?, buyer_country_code = ?, buyer_vat_id = ?, buyer_email = ?,
         payment_means_code = ?, payment_terms = ?, iban = ?, bic = ?, payment_reference = ?, account_name = ?,
         tax_category_code = ?, tax_rate = ?, kleinunternehmer = ?,
@@ -135,7 +136,7 @@ export class InvoiceModel {
       dto.invoiceNumber, dto.invoiceDate, dto.invoiceTypeCode, dto.currencyCode, dto.dueDate ?? null, dto.buyerReference ?? '',
       dto.note ?? null, dto.deliveryDate ?? null, dto.orderReference ?? null, dto.contractReference ?? null,
       dto.seller.name, dto.seller.street, dto.seller.city, dto.seller.postalCode, dto.seller.countryCode,
-      dto.seller.vatId ?? null, dto.seller.taxNumber ?? null, dto.seller.contactName ?? null, dto.seller.contactPhone ?? null, dto.seller.contactEmail ?? null,
+      dto.seller.vatId ?? null, dto.seller.taxNumber ?? null, dto.seller.contactName ?? null, dto.seller.contactPhone ?? null, dto.seller.contactEmail ?? null, dto.seller.legalRegistration ?? null,
       dto.buyer.name, dto.buyer.street, dto.buyer.city, dto.buyer.postalCode, dto.buyer.countryCode, dto.buyer.vatId ?? null, dto.buyer.email ?? null,
       dto.paymentMeansCode, dto.paymentTerms ?? null, dto.iban ?? null, dto.bic ?? null, dto.paymentReference ?? null, dto.accountName ?? null,
       dto.taxCategoryCode, dto.taxRate, dto.kleinunternehmer ? 1 : 0,
@@ -161,13 +162,13 @@ export class InvoiceModel {
       UPDATE invoices SET
         seller_name = ?, seller_street = ?, seller_city = ?, seller_postal_code = ?,
         seller_country_code = ?, seller_vat_id = ?, seller_tax_number = ?,
-        seller_contact_name = ?, seller_contact_phone = ?, seller_contact_email = ?,
+        seller_contact_name = ?, seller_contact_phone = ?, seller_contact_email = ?, seller_legal_registration = ?,
         updated_at = datetime('now')
       WHERE seller_name = ? AND seller_city = ?
     `).run(
       newParty.name, newParty.street, newParty.city, newParty.postalCode,
       newParty.countryCode, newParty.vatId ?? null, newParty.taxNumber ?? null,
-      newParty.contactName ?? null, newParty.contactPhone ?? null, newParty.contactEmail ?? null,
+      newParty.contactName ?? null, newParty.contactPhone ?? null, newParty.contactEmail ?? null, newParty.legalRegistration ?? null,
       oldName, oldCity,
     );
     return result.changes;
@@ -218,6 +219,7 @@ export class InvoiceModel {
         contactName: row.seller_contact_name ?? undefined,
         contactPhone: row.seller_contact_phone ?? undefined,
         contactEmail: row.seller_contact_email ?? undefined,
+        legalRegistration: row.seller_legal_registration ?? undefined,
       },
       buyer: {
         name: row.buyer_name,

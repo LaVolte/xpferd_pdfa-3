@@ -82,6 +82,10 @@ export class XRechnungXmlService {
     // Seller (BG-4)
     const seller = agreement.ele('ram:SellerTradeParty');
     seller.ele('ram:Name').txt(invoice.seller.name);
+    // BT-33 — legal registration info (managing directors, registered office, commercial register)
+    if (invoice.seller.legalRegistration?.trim()) {
+      seller.ele('ram:Description').txt(invoice.seller.legalRegistration.trim());
+    }
 
     // Seller contact (BG-6) — BR-DE-2: mandatory for XRechnung
     const contact = seller.ele('ram:DefinedTradeContact');

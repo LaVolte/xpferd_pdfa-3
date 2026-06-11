@@ -288,6 +288,8 @@ export class Database {
     addColumnIfMissing('invoices', 'prepaid_amount', 'REAL DEFAULT 0');
     addColumnIfMissing('invoice_lines', 'item_description', 'TEXT');
     addColumnIfMissing('invoices', 'auto_generated', 'INTEGER NOT NULL DEFAULT 0');
+    addColumnIfMissing('invoices', 'seller_legal_registration', 'TEXT');
+    addColumnIfMissing('parties', 'legal_registration', 'TEXT');
 
     // Recurring invoice email auto-send fields
     addColumnIfMissing('recurring_invoices', 'auto_send_email', 'INTEGER NOT NULL DEFAULT 0');

@@ -38,7 +38,7 @@
     editing = {
       type: partyType,
       name: '', street: '', city: '', postalCode: '', countryCode: 'DE',
-      vatId: '', taxNumber: '', contactName: '', contactPhone: '', contactEmail: '', email: '',
+      vatId: '', taxNumber: '', contactName: '', contactPhone: '', contactEmail: '', email: '', legalRegistration: '',
     };
     editError = '';
     fieldErrors = {};
@@ -274,6 +274,11 @@
                 class:field-invalid={fieldErrors['contactEmail']} oninput={() => clearFieldError('contactEmail')} />
               {#if fieldErrors['contactEmail']}<span class="field-error">{fieldErrors['contactEmail']}</span>{/if}
             </div>
+          </div>
+          <div class="form-group">
+            <label for="edit-legalRegistration">Handelsregister / Pflichtangaben (BT-33)</label>
+            <input id="edit-legalRegistration" bind:value={editing.legalRegistration}
+              placeholder="z.B. GF: Max Muster | HRB 12345 Berlin" />
           </div>
         {:else}
           <div class="form-row">

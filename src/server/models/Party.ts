@@ -15,6 +15,7 @@ interface PartyRow {
   contact_phone: string | null;
   contact_email: string | null;
   email: string | null;
+  legal_registration: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -40,12 +41,12 @@ export class PartyModel {
   create(dto: PartyDto): PartyDto {
     const result = this.db.prepare(`
       INSERT INTO parties (type, name, street, city, postal_code, country_code,
-        vat_id, tax_number, contact_name, contact_phone, contact_email, email)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        vat_id, tax_number, contact_name, contact_phone, contact_email, email, legal_registration)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       dto.type, dto.name, dto.street, dto.city, dto.postalCode, dto.countryCode,
       dto.vatId ?? null, dto.taxNumber ?? null, dto.contactName ?? null,
-      dto.contactPhone ?? null, dto.contactEmail ?? null, dto.email ?? null,
+      dto.contactPhone ?? null, dto.contactEmail ?? null, dto.email ?? null, dto.legalRegistration ?? null,
     );
     return this.findById(result.lastInsertRowid as number)!;
   }
@@ -58,12 +59,12 @@ export class PartyModel {
       UPDATE parties SET
         type = ?, name = ?, street = ?, city = ?, postal_code = ?, country_code = ?,
         vat_id = ?, tax_number = ?, contact_name = ?, contact_phone = ?, contact_email = ?,
-        email = ?, updated_at = datetime('now')
+        email = ?, legal_registration = ?, updated_at = datetime('now')
       WHERE id = ?
     `).run(
       dto.type, dto.name, dto.street, dto.city, dto.postalCode, dto.countryCode,
       dto.vatId ?? null, dto.taxNumber ?? null, dto.contactName ?? null,
-      dto.contactPhone ?? null, dto.contactEmail ?? null, dto.email ?? null,
+      dto.contactPhone ?? null, dto.contactEmail ?? null, dto.email ?? null, dto.legalRegistration ?? null,
       id,
     );
     return this.findById(id)!;
@@ -89,6 +90,7 @@ export class PartyModel {
       contactPhone: row.contact_phone ?? undefined,
       contactEmail: row.contact_email ?? undefined,
       email: row.email ?? undefined,
+      legalRegistration: row.legal_registration ?? undefined,
     };
   }
 }

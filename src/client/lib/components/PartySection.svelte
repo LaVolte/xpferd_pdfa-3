@@ -56,6 +56,7 @@
         party.contactName = '';
         party.contactPhone = '';
         party.contactEmail = '';
+        party.legalRegistration = '';
       } else {
         party.email = '';
       }
@@ -76,6 +77,7 @@
       party.contactName = found.contactName ?? '';
       party.contactPhone = found.contactPhone ?? '';
       party.contactEmail = found.contactEmail ?? '';
+      party.legalRegistration = found.legalRegistration ?? '';
     } else {
       party.email = found.email ?? '';
     }
@@ -169,6 +171,16 @@
               {#if selectedParty.contactEmail} · {selectedParty.contactEmail}{/if}
               {#if selectedParty.contactPhone} · {selectedParty.contactPhone}{/if}
             </span>
+          </div>
+        {/if}
+        {#if isSeller && selectedParty.legalRegistration}
+          <div class="detail-row">
+            <span class="detail-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+              </svg>
+            </span>
+            <span class="detail-value">{selectedParty.legalRegistration}</span>
           </div>
         {/if}
         {#if !isSeller && selectedParty.email}

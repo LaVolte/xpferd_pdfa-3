@@ -11,6 +11,7 @@ const sellerSchema = z.object({
   contactName: z.string(),
   contactPhone: z.string(),
   contactEmail: z.string(),
+  legalRegistration: z.string().optional(),
 });
 
 const buyerSchema = z.object({

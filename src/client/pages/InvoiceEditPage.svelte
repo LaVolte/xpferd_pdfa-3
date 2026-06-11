@@ -48,7 +48,7 @@
       contractReference: '',
       seller: {
         name: '', street: '', city: '', postalCode: '', countryCode: 'DE',
-        vatId: '', taxNumber: '', contactName: '', contactPhone: '', contactEmail: '',
+        vatId: '', taxNumber: '', contactName: '', contactPhone: '', contactEmail: '', legalRegistration: '',
       },
       buyer: {
         name: '', street: '', city: '', postalCode: '', countryCode: 'DE',
