@@ -1,6 +1,6 @@
 /**
  * ZUGFeRDService — embeds an XRechnung UBL XML file into a PDF to produce a
- * hybrid ZUGFeRD 2.3 / Factur-X XRECHNUNG invoice.
+ * hybrid ZUGFeRD 3.0 / Factur-X XRECHNUNG invoice.
  *
  * The resulting PDF contains:
  *  • factur-x.xml as an EmbeddedFile with AFRelationship = Alternative
@@ -174,7 +174,7 @@ export class ZUGFeRDService {
       `        xmlns:fx="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">\n` +
       `      <fx:DocumentFileName>${ATTACHMENT_NAME}</fx:DocumentFileName>\n` +
       `      <fx:DocumentType>INVOICE</fx:DocumentType>\n` +
-      `      <fx:Version>2.3.1</fx:Version>\n` +
+      `      <fx:Version>3.0</fx:Version>\n` +
       `      <fx:ConformanceLevel>XRECHNUNG</fx:ConformanceLevel>\n` +
       `    </rdf:Description>\n` +
 

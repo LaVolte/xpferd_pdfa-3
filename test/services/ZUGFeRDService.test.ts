@@ -221,8 +221,8 @@ describe('ZUGFeRD — XMP metadata in catalog', () => {
     expect(xmpText).toContain('<fx:ConformanceLevel>XRECHNUNG</fx:ConformanceLevel>');
   });
 
-  it('declares ZUGFeRD version 2.3.1', () => {
-    expect(xmpText).toContain('<fx:Version>2.3.1</fx:Version>');
+  it('declares ZUGFeRD version 3.0', () => {
+    expect(xmpText).toContain('<fx:Version>3.0</fx:Version>');
   });
 
   it('declares document file name factur-x.xml', () => {
@@ -316,8 +316,8 @@ describe('XRechnung XML — structure and required elements', () => {
     expect(xmlString).toContain('rsm:CrossIndustryInvoice');
   });
 
-  it('contains XRechnung 2.3 customization ID (BT-24)', () => {
-    expect(xmlString).toContain('urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3');
+  it('contains XRechnung 3.0 customization ID (BT-24)', () => {
+    expect(xmlString).toContain('urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_3.0');
   });
 
   it('is well-formed CII (CrossIndustryInvoice root)', () => {
