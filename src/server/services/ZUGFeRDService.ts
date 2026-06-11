@@ -15,7 +15,7 @@
  *  Namespace: urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#
  */
 
-import { PDF, PdfArray, PdfDict, PdfName, PdfNumber, PdfStream, PdfString } from '@libpdf/core';
+import { PDF, PdfArray, PdfDict, PdfName, PdfNumber, PdfRef, PdfStream, PdfString } from '@libpdf/core';
 import { loadSrgbProfile } from '../assets/iccLoader.js';
 
 /** AFRelationship value required by ZUGFeRD for the invoice attachment. */
@@ -42,11 +42,18 @@ export class ZUGFeRDService {
       description: 'XRechnung UBL 2.1 Invoice',
     });
 
-    // 2. Set AFRelationship on the FileSpec dict and add /AF to catalog
+    // 2. Set AFRelationship on the FileSpec dict, add /AF to catalog, and fix
+    //    the EmbeddedFile stream to carry Type + Subtype (PDF/A-3 §6.8).
     //
     // NOTE: NameTree.get() resolves indirect references — it returns the
     // resolved PdfDict, not the PdfRef. Use ctx.getRef() to retrieve the
     // original indirect reference for inclusion in the /AF array.
+    //
+    // addAttachment() records mimeType only at the higher-level API layer; the
+    // underlying EmbeddedFile stream may lack the /Subtype name entry required
+    // by ISO 19005-3 §6.8.1. Replace the stream with one that has both
+    // /Type /EmbeddedFile and /Subtype /application#2Fxml (slash is encoded as
+    // #2F in PDF name syntax).
     const ctx = pdf.context;
     const tree = ctx.catalog.getEmbeddedFilesTree();
     if (tree) {
@@ -55,9 +62,25 @@ export class ZUGFeRDService {
         fileSpec.set('AFRelationship', PdfName.of(AF_RELATIONSHIP));
         const fileSpecRef = ctx.getRef(fileSpec);
         if (fileSpecRef) {
-          // Add /AF array to document catalog (points at the file spec)
-          const catalog = pdf.getCatalog();
-          catalog.set('AF', PdfArray.of(fileSpecRef));
+          pdf.getCatalog().set('AF', PdfArray.of(fileSpecRef));
+        }
+
+        // Replace the EF stream so it declares Subtype (PDF/A-3 §6.8)
+        const rawEf = fileSpec.get('EF');
+        const efDict = rawEf instanceof PdfRef
+          ? ctx.resolve(rawEf) as PdfDict
+          : rawEf instanceof PdfDict ? rawEf : null;
+        if (efDict) {
+          const newEfStream = PdfStream.fromDict(
+            {
+              Type: PdfName.of('EmbeddedFile'),
+              Subtype: PdfName.of('application#2Fxml'),
+            },
+            xmlBytes,
+          );
+          const newEfRef = ctx.register(newEfStream);
+          efDict.set('F', newEfRef);
+          efDict.set('UF', newEfRef);
         }
       }
     }
