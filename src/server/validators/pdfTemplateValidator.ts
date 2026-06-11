@@ -8,7 +8,7 @@ const pdfBlockSchema = z.object({
     'invoice-title', 'invoice-number', 'invoice-date', 'due-date', 'buyer-reference',
     'total-net', 'total-tax', 'total-gross',
     'payment-means', 'iban-bic', 'payment-terms',
-    'kleinunternehmer-note',
+    'kleinunternehmer-note', 'seller-legal',
   ]),
   x: z.number().min(0),
   y: z.number().min(0),
