@@ -1,5 +1,6 @@
 import { PDF, rgb, measureText } from '@libpdf/core';
 import type { PDFPage, RGB, Standard14FontName, EmbeddedFont, FontInput } from '@libpdf/core';
+import { loadLiberationSansRegular, loadLiberationSansBold } from '../assets/fontLoader.js';
 import type { PdfTemplateDto, PdfBlockDto, InvoiceDto } from '../../shared/types';
 import { UNIT_CODES, PAYMENT_MEANS_CODES, KLEINUNTERNEHMER_NOTE } from '../../shared/constants/index.js';
 import { formatIban, fmtDate } from '../../shared/constants/format.js';
@@ -89,6 +90,29 @@ export class PdfRenderService {
 
     // Embed custom fonts — store regular + optional bold EmbeddedFont objects
     const fontMap = new Map<string, { regular: EmbeddedFont; bold?: EmbeddedFont }>();
+
+    // Gap 2 — PDF/A-3b requires all fonts to be embedded. Embed Liberation Sans
+    // (metric-compatible with Helvetica) as the default fallback so the document
+    // never references unembedded Standard-14 fonts.
+    // Requires: apk add font-liberation (Alpine) or apt-get install fonts-liberation (Debian).
+    try {
+      const regularBytes = loadLiberationSansRegular();
+      if (regularBytes) {
+        const regular = pdf.embedFont(regularBytes);
+        const boldBytes = loadLiberationSansBold();
+        const bold = boldBytes ? pdf.embedFont(boldBytes) : undefined;
+        fontMap.set('_default', { regular, bold });
+      } else {
+        console.warn(
+          '[PdfRenderService] Liberation Sans not found — PDF will use non-embedded Helvetica. ' +
+          'For PDF/A-3b compliance install the font: apk add font-liberation (Alpine) or ' +
+          'apt-get install fonts-liberation (Debian), or place TTF files in src/server/assets/fonts/.',
+        );
+      }
+    } catch (err) {
+      console.warn('[PdfRenderService] Liberation Sans embedding failed, falling back to Helvetica:', err);
+    }
+
     if (template.customFonts && template.customFonts.length > 0) {
       for (const cf of template.customFonts) {
         try {
@@ -127,14 +151,17 @@ export class PdfRenderService {
   ): void {
     const fontSize = block.fontSize ?? DEFAULT_FONT_SIZE;
     const color = this.parseColor(block.fontColor ?? DEFAULT_FONT_COLOR);
-    // Select font: prefer custom font entry, respecting fontWeight when bold variant exists
+    // Select font: prefer explicit custom font, then '_default' (embedded Liberation Sans),
+    // then fall back to Standard-14 Helvetica only if no embedded font is available.
     const entry = block.fontFamily ? fontMap.get(block.fontFamily) : undefined;
-    const font: FontInput = entry
-      ? (block.fontWeight === 'bold' && entry.bold ? entry.bold : entry.regular)
+    const defaultEntry = fontMap.get('_default');
+    const resolvedEntry = entry ?? defaultEntry;
+    const font: FontInput = resolvedEntry
+      ? (block.fontWeight === 'bold' && resolvedEntry.bold ? resolvedEntry.bold : resolvedEntry.regular)
       : (block.fontWeight === 'bold' ? 'Helvetica-Bold' : 'Helvetica');
     // Bold font for components that always bold the last/emphasis row (e.g. Bruttobetrag)
-    const boldFont: FontInput = entry
-      ? (entry.bold ?? entry.regular)   // prefer bold variant; fall back to regular
+    const boldFont: FontInput = resolvedEntry
+      ? (resolvedEntry.bold ?? resolvedEntry.regular)
       : 'Helvetica-Bold';
 
     // Y-coordinate: CSS is top-left origin (y-down), PDF is bottom-left (y-up).

@@ -5,19 +5,18 @@
  * The resulting PDF contains:
  *  • xrechnung.xml as an EmbeddedFile with AFRelationship = Alternative
  *  • /AF array in the document catalog pointing at the embedded file
- *  • XMP metadata stream with PDF/A-3b and ZUGFeRD XRECHNUNG declarations
- *
- * Note: strict PDF/A-3 conformance additionally requires colour-space
- * declarations, font embedding, etc. that the base renderer does not
- * produce. The XMP declaration, embedded file and AF entry are the
- * requirements checked by most ZUGFeRD validators (Mustang, Factur-X lib).
+ *  • XMP metadata stream with PDF/A-3b, Dublin Core, XMP Basic, PDF basic,
+ *    and ZUGFeRD XRECHNUNG declarations (all required namespaces for PDF/A-3)
+ *  • /OutputIntents entry in the catalog with an sRGB ICC v4 profile stream
+ *    (ISO 19005-3 §6.2.3 — required when the document uses DeviceRGB colours)
  *
  * Spec reference:
  *  ZUGFeRD 2.3 / Factur-X 1.0.07
  *  Namespace: urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#
  */
 
-import { PDF, PdfArray, PdfDict, PdfName, PdfStream } from '@libpdf/core';
+import { PDF, PdfArray, PdfDict, PdfName, PdfNumber, PdfStream, PdfString } from '@libpdf/core';
+import { loadSrgbProfile } from '../assets/iccLoader.js';
 
 /** AFRelationship value required by ZUGFeRD for the invoice attachment. */
 const AF_RELATIONSHIP = 'Alternative';
@@ -35,6 +34,7 @@ export class ZUGFeRDService {
   async embed(pdfBytes: Uint8Array, xmlString: string): Promise<Uint8Array> {
     const pdf = await PDF.load(pdfBytes);
     const xmlBytes = new TextEncoder().encode(xmlString);
+    const now = new Date();
 
     // 1. Attach the XML file
     pdf.addAttachment(ATTACHMENT_NAME, xmlBytes, {
@@ -62,8 +62,8 @@ export class ZUGFeRDService {
       }
     }
 
-    // 3. Create and set ZUGFeRD XMP metadata stream
-    const xmpBytes = new TextEncoder().encode(this.buildXmp());
+    // 3. Create and set ZUGFeRD XMP metadata stream (full required namespace set)
+    const xmpBytes = new TextEncoder().encode(this.buildXmp(now));
     const metadataStream = PdfStream.fromDict(
       { Type: PdfName.of('Metadata'), Subtype: PdfName.of('XML') },
       xmpBytes,
@@ -71,13 +71,51 @@ export class ZUGFeRDService {
     const metadataRef = ctx.register(metadataStream);
     pdf.getCatalog().set('Metadata', metadataRef);
 
+    // 4. Embed sRGB OutputIntent (ISO 19005-3 §6.2.3 — required for DeviceRGB)
+    this.embedOutputIntent(pdf);
+
     return new Uint8Array(await pdf.save());
   }
 
-  private buildXmp(): string {
-    // The BOM character (\uFEFF) before the encoding declaration is required by the XMP spec.
+  /**
+   * Attach an sRGB ICC v4 OutputIntent to the PDF catalog.
+   *
+   * PDF/A-3b (ISO 19005-3 §6.2.3) requires /OutputIntents when the document
+   * uses DeviceRGB colour spaces. The GTS_PDFA1 sub-type signals to PDF/A
+   * validators that this intent is the authoritative colour characterisation.
+   */
+  private embedOutputIntent(pdf: PDF): void {
+    const profileBytes = loadSrgbProfile();
+    const ctx = pdf.context;
+
+    // ICC profile stream — N=3 for RGB (required by ISO 32000 §10.3.2)
+    const profileStream = PdfStream.fromDict(
+      { N: PdfNumber.of(3) },
+      profileBytes,
+    );
+    const profileRef = ctx.register(profileStream);
+
+    const outputIntentDict = PdfDict.of({
+      Type: PdfName.of('OutputIntent'),
+      S: PdfName.of('GTS_PDFA1'),
+      OutputConditionIdentifier: PdfString.fromString('sRGB IEC61966-2.1'),
+      DestOutputProfile: profileRef,
+    });
+    const outputIntentRef = ctx.register(outputIntentDict);
+
+    pdf.getCatalog().set('OutputIntents', PdfArray.of(outputIntentRef));
+  }
+
+  /** Format a Date as an XMP/ISO 8601 timestamp with UTC offset. */
+  private formatXmpDate(d: Date): string {
+    return d.toISOString().replace(/\.\d{3}Z$/, '+00:00');
+  }
+
+  private buildXmp(now: Date): string {
+    const ts = this.formatXmpDate(now);
+    // The BOM character (﻿) before the id attribute is required by the XMP spec.
     return (
-      `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>\n` +
+      `<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n` +
       `<x:xmpmeta xmlns:x="adobe:ns:meta/">\n` +
       `  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n` +
 
@@ -86,6 +124,26 @@ export class ZUGFeRDService {
       `        xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">\n` +
       `      <pdfaid:part>3</pdfaid:part>\n` +
       `      <pdfaid:conformance>B</pdfaid:conformance>\n` +
+      `    </rdf:Description>\n` +
+
+      // Dublin Core — required baseline namespace for PDF/A-3
+      `    <rdf:Description rdf:about=""\n` +
+      `        xmlns:dc="http://purl.org/dc/elements/1.1/">\n` +
+      `      <dc:format>application/pdf</dc:format>\n` +
+      `    </rdf:Description>\n` +
+
+      // XMP Basic — required baseline namespace for PDF/A-3
+      `    <rdf:Description rdf:about=""\n` +
+      `        xmlns:xmp="http://ns.adobe.com/xap/1.0/">\n` +
+      `      <xmp:CreatorTool>xpferd</xmp:CreatorTool>\n` +
+      `      <xmp:CreateDate>${ts}</xmp:CreateDate>\n` +
+      `      <xmp:ModifyDate>${ts}</xmp:ModifyDate>\n` +
+      `    </rdf:Description>\n` +
+
+      // PDF basic — required baseline namespace for PDF/A-3
+      `    <rdf:Description rdf:about=""\n` +
+      `        xmlns:pdf="http://ns.adobe.com/pdf/1.3/">\n` +
+      `      <pdf:Producer>xpferd / @libpdf/core</pdf:Producer>\n` +
       `    </rdf:Description>\n` +
 
       // ZUGFeRD / Factur-X metadata

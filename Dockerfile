@@ -22,7 +22,8 @@ RUN CI=true pnpm prune --prod
 
 # Production stage
 FROM node:24-alpine AS production
-RUN apk add --no-cache tini
+# tini: init process  font-liberation: embedded fonts required for PDF/A-3b compliance
+RUN apk add --no-cache tini font-liberation
 WORKDIR /app
 
 COPY --from=base /app/package.json ./

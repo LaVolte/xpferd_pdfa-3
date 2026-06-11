@@ -6,6 +6,7 @@
  *  3. /AF array in the document catalog pointing at the embedded file
  *  4. XMP metadata stream with ZUGFeRD XRECHNUNG conformance declaration
  *  5. The embedded XML is byte-for-byte the original XRechnung XML
+ *  6. /OutputIntents in catalog with sRGB ICC v4 profile (Gap 3)
  *
  * Also validates the XRechnung XML structure (well-formed, required elements).
  */
@@ -14,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import path from 'path';
 import fs from 'fs';
 import { Database } from '../../src/server/database/Database.js';
-import { PDF, PdfArray, PdfDict, PdfRef } from '@libpdf/core';
+import { PDF, PdfArray, PdfDict, PdfRef, PdfStream } from '@libpdf/core';
 import { ZUGFeRDService } from '../../src/server/services/ZUGFeRDService.js';
 import { XRechnungXmlService } from '../../src/server/services/XRechnungXmlService.js';
 import { PdfRenderService } from '../../src/server/services/PdfRenderService.js';
@@ -236,10 +237,77 @@ describe('ZUGFeRD — XMP metadata in catalog', () => {
     expect(xmpText).toContain('<pdfaid:part>3</pdfaid:part>');
     expect(xmpText).toContain('<pdfaid:conformance>B</pdfaid:conformance>');
   });
+
+  it('contains Dublin Core namespace with dc:format (Gap 1)', () => {
+    expect(xmpText).toContain('http://purl.org/dc/elements/1.1/');
+    expect(xmpText).toContain('<dc:format>application/pdf</dc:format>');
+  });
+
+  it('contains XMP Basic namespace with CreatorTool and timestamps (Gap 1)', () => {
+    expect(xmpText).toContain('http://ns.adobe.com/xap/1.0/');
+    expect(xmpText).toContain('<xmp:CreatorTool>xpferd</xmp:CreatorTool>');
+    expect(xmpText).toContain('<xmp:CreateDate>');
+    expect(xmpText).toContain('<xmp:ModifyDate>');
+  });
+
+  it('contains PDF basic namespace with Producer (Gap 1)', () => {
+    expect(xmpText).toContain('http://ns.adobe.com/pdf/1.3/');
+    expect(xmpText).toContain('<pdf:Producer>');
+  });
 });
 
 // ---------------------------------------------------------------------------
-// 5. XRechnung XML structure validation
+// 5. OutputIntent — sRGB ICC profile (Gap 3)
+// ---------------------------------------------------------------------------
+
+describe('ZUGFeRD — OutputIntent in catalog (Gap 3)', () => {
+  it('catalog has /OutputIntents entry', () => {
+    const catalog = pdf.getCatalog();
+    expect(catalog.has('OutputIntents'), '/OutputIntents must be in catalog').toBe(true);
+  });
+
+  it('/OutputIntents is an array with one entry', () => {
+    const catalog = pdf.getCatalog();
+    const oi = catalog.getArray('OutputIntents');
+    expect(oi instanceof PdfArray, '/OutputIntents should be a PdfArray').toBe(true);
+    expect(oi!.length).toBe(1);
+  });
+
+  it('OutputIntent dict has S=/GTS_PDFA1 and correct identifier', () => {
+    const catalog = pdf.getCatalog();
+    const oiArray = catalog.getArray('OutputIntents')!;
+    const firstEntry = oiArray.at(0);
+    expect(firstEntry instanceof PdfRef, 'OutputIntents[0] should be a PdfRef').toBe(true);
+
+    const dict = pdf.context.resolve(firstEntry as PdfRef);
+    expect(dict instanceof PdfDict, 'OutputIntents[0] must resolve to a PdfDict').toBe(true);
+
+    const s = (dict as PdfDict).getName('S');
+    expect(s?.value).toBe('GTS_PDFA1');
+
+    const oci = (dict as PdfDict).getString('OutputConditionIdentifier');
+    expect(oci?.asString()).toBe('sRGB IEC61966-2.1');
+  });
+
+  it('DestOutputProfile resolves to a PdfStream (ICC profile bytes present)', () => {
+    const catalog = pdf.getCatalog();
+    const oiArray = catalog.getArray('OutputIntents')!;
+    const intentDict = pdf.context.resolve(oiArray.at(0) as PdfRef) as PdfDict;
+
+    const profileRef = intentDict.get('DestOutputProfile');
+    expect(profileRef instanceof PdfRef, 'DestOutputProfile must be a PdfRef').toBe(true);
+
+    const profileStream = pdf.context.resolve(profileRef as PdfRef);
+    expect(profileStream instanceof PdfStream, 'DestOutputProfile must resolve to a PdfStream').toBe(true);
+
+    // Verify the stream contains data (480-byte sRGB ICC v4 profile)
+    const data = (profileStream as PdfStream).getDecodedData();
+    expect(data.length).toBe(480);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. XRechnung XML structure validation
 // ---------------------------------------------------------------------------
 
 describe('XRechnung XML — structure and required elements', () => {
@@ -293,7 +361,7 @@ describe('XRechnung XML — structure and required elements', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Kleinunternehmer (§19 UStG) — VAT-exempt variant
+// 8. Kleinunternehmer (§19 UStG) — VAT-exempt variant
 // ---------------------------------------------------------------------------
 
 describe('XRechnung XML — Kleinunternehmer variant', () => {
