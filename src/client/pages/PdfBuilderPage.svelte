@@ -306,12 +306,11 @@
     listGenerating = { ...listGenerating, [templateId]: true };
     listGenError = '';
     try {
-      const fullTemplate = await pdfTemplateApi.get(templateId);
-      const blob = await pdfTemplateApi.previewDraft(fullTemplate, invoiceId);
+      const blob = await pdfTemplateApi.exportZugferd(templateId, invoiceId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `rechnung-${invoiceId}.pdf`;
+      a.download = `rechnung-ZUGFeRD-${invoiceId}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
