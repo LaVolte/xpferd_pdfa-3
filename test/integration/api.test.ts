@@ -100,7 +100,7 @@ describe('API Integration', () => {
     const res = await fetch(`${baseUrl}/api/v1/invoices/${list[0].id}/export`);
     expect(res.status).toBe(200);
     const xml = await res.text();
-    expect(xml).toContain('<ubl:Invoice');
+    expect(xml).toContain('rsm:CrossIndustryInvoice');
     expect(xml).toContain('API-001');
   });
 

@@ -3,7 +3,7 @@
  * hybrid ZUGFeRD 2.3 / Factur-X XRECHNUNG invoice.
  *
  * The resulting PDF contains:
- *  • xrechnung.xml as an EmbeddedFile with AFRelationship = Alternative
+ *  • factur-x.xml as an EmbeddedFile with AFRelationship = Alternative
  *  • /AF array in the document catalog pointing at the embedded file
  *  • XMP metadata stream with PDF/A-3b, Dublin Core, XMP Basic, PDF basic,
  *    and ZUGFeRD XRECHNUNG declarations (all required namespaces for PDF/A-3)
@@ -21,15 +21,15 @@ import { loadSrgbProfile } from '../assets/iccLoader.js';
 /** AFRelationship value required by ZUGFeRD for the invoice attachment. */
 const AF_RELATIONSHIP = 'Alternative';
 
-/** Embedded file name mandated by the ZUGFeRD XRECHNUNG profile. */
-const ATTACHMENT_NAME = 'xrechnung.xml';
+/** Embedded file name mandated by the Factur-X / ZUGFeRD specification §6. */
+const ATTACHMENT_NAME = 'factur-x.xml';
 
 export class ZUGFeRDService {
   /**
    * Embed `xmlString` into `pdfBytes` and return ZUGFeRD-compliant PDF bytes.
    *
    * @param pdfBytes  Raw PDF produced by PdfRenderService.render()
-   * @param xmlString XRechnung UBL 2.1 XML string (from XRechnungXmlService.generate())
+   * @param xmlString Factur-X CII XML string (from XRechnungXmlService.generate())
    */
   async embed(pdfBytes: Uint8Array, xmlString: string): Promise<Uint8Array> {
     const pdf = await PDF.load(pdfBytes);

@@ -1,7 +1,7 @@
 /**
  * ZUGFeRDService tests — verify that the generated hybrid PDF contains:
  *
- *  1. An embedded file named "xrechnung.xml"
+ *  1. An embedded file named "factur-x.xml"
  *  2. AFRelationship = Alternative on the file spec
  *  3. /AF array in the document catalog pointing at the embedded file
  *  4. XMP metadata stream with ZUGFeRD XRECHNUNG conformance declaration
@@ -124,19 +124,19 @@ beforeAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe('ZUGFeRD — embedded XML file', () => {
-  it('pdf.hasAttachment("xrechnung.xml") returns true', () => {
-    expect(pdf.hasAttachment('xrechnung.xml')).toBe(true);
+  it('pdf.hasAttachment("factur-x.xml") returns true', () => {
+    expect(pdf.hasAttachment('factur-x.xml')).toBe(true);
   });
 
   it('attachment content equals the original XRechnung XML', () => {
-    const bytes = pdf.getAttachment('xrechnung.xml');
+    const bytes = pdf.getAttachment('factur-x.xml');
     expect(bytes, 'attachment must not be null').not.toBeNull();
     const decoded = new TextDecoder().decode(bytes!);
     expect(decoded).toBe(xmlString);
   });
 
   it('MIME type is application/xml', () => {
-    const info = pdf.getAttachments().get('xrechnung.xml');
+    const info = pdf.getAttachments().get('factur-x.xml');
     expect(info?.mimeType).toContain('application/xml');
   });
 });
@@ -152,8 +152,8 @@ describe('ZUGFeRD — AFRelationship on FileSpec', () => {
     expect(tree, 'EmbeddedFiles tree must exist').not.toBeNull();
 
     // NameTree.get() resolves indirect references — returns a PdfDict, not PdfRef
-    const fileSpec = tree!.get('xrechnung.xml');
-    expect(fileSpec, 'xrechnung.xml must be in the name tree').not.toBeNull();
+    const fileSpec = tree!.get('factur-x.xml');
+    expect(fileSpec, 'factur-x.xml must be in the name tree').not.toBeNull();
     expect(fileSpec instanceof PdfDict, 'FileSpec should be a PdfDict').toBe(true);
 
     const rel = (fileSpec as PdfDict).getName('AFRelationship');
@@ -179,7 +179,7 @@ describe('ZUGFeRD — /AF array in catalog', () => {
     expect(af!.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('/AF entry resolves to the xrechnung.xml FileSpec', () => {
+  it('/AF entry resolves to the factur-x.xml FileSpec', () => {
     const ctx = pdf.context;
     const catalog = pdf.getCatalog();
     const af = catalog.getArray('AF')!;
@@ -189,9 +189,9 @@ describe('ZUGFeRD — /AF array in catalog', () => {
     const fileSpec = ctx.resolve(firstRef as PdfRef);
     expect(fileSpec instanceof PdfDict, 'AF[0] should resolve to a PdfDict').toBe(true);
 
-    // The FileSpec should have F = "xrechnung.xml"
+    // The FileSpec should have F = "factur-x.xml"
     const fname = (fileSpec as PdfDict).getString('UF') ?? (fileSpec as PdfDict).getString('F');
-    expect(fname?.asString()).toBe('xrechnung.xml');
+    expect(fname?.asString()).toBe('factur-x.xml');
   });
 });
 
@@ -225,8 +225,8 @@ describe('ZUGFeRD — XMP metadata in catalog', () => {
     expect(xmpText).toContain('<fx:Version>2.3</fx:Version>');
   });
 
-  it('declares document file name xrechnung.xml', () => {
-    expect(xmpText).toContain('<fx:DocumentFileName>xrechnung.xml</fx:DocumentFileName>');
+  it('declares document file name factur-x.xml', () => {
+    expect(xmpText).toContain('<fx:DocumentFileName>factur-x.xml</fx:DocumentFileName>');
   });
 
   it('declares document type INVOICE', () => {
@@ -311,22 +311,27 @@ describe('ZUGFeRD — OutputIntent in catalog (Gap 3)', () => {
 // ---------------------------------------------------------------------------
 
 describe('XRechnung XML — structure and required elements', () => {
-  it('is well-formed XML (parses without error)', () => {
-    // Use the DOMParser-equivalent — parse as text, check for parse errors
+  it('is well-formed CII XML', () => {
     expect(xmlString).toContain('<?xml');
-    expect(xmlString).toContain('ubl:Invoice');
+    expect(xmlString).toContain('rsm:CrossIndustryInvoice');
   });
 
-  it('contains CustomizationID for XRechnung 3.0', () => {
-    expect(xmlString).toContain('urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0');
+  it('contains Factur-X XRECHNUNG CII customization ID', () => {
+    expect(xmlString).toContain('urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3');
+    expect(xmlString).toContain('urn:factur-x.eu:1p0:xrechnung');
+  });
+
+  it('is well-formed CII (CrossIndustryInvoice root)', () => {
+    expect(xmlString).toContain('rsm:CrossIndustryInvoice');
+    expect(xmlString).toContain('xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"');
   });
 
   it('contains invoice number', () => {
     expect(xmlString).toContain('ZUG-2024-0001');
   });
 
-  it('contains invoice date', () => {
-    expect(xmlString).toContain('2024-06-01');
+  it('contains invoice date in CII format (YYYYMMDD, no dashes)', () => {
+    expect(xmlString).toContain('20240601');
   });
 
   it('contains seller name', () => {
@@ -353,10 +358,11 @@ describe('XRechnung XML — structure and required elements', () => {
     expect(xmlString).toContain('1190');
   });
 
-  it('has valid UBL 2.1 root element', () => {
-    expect(xmlString).toContain('xmlns:ubl="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"');
-    expect(xmlString).toContain('xmlns:cac=');
-    expect(xmlString).toContain('xmlns:cbc=');
+  it('uses CII namespaces and has no UBL elements', () => {
+    expect(xmlString).toContain('xmlns:ram=');
+    expect(xmlString).toContain('xmlns:udt=');
+    expect(xmlString).not.toContain('xmlns:ubl=');
+    expect(xmlString).not.toContain('xmlns:cbc=');
   });
 });
 
@@ -380,6 +386,6 @@ describe('XRechnung XML — Kleinunternehmer variant', () => {
     };
     const xml = xmlSvc.generate(kleinInvoice);
     expect(xml).toContain('§19');
-    expect(xml).toContain('TaxExemptionReasonCode');
+    expect(xml).toContain('ExemptionReasonCode');
   });
 });

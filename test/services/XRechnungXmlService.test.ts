@@ -10,6 +10,7 @@ function sampleInvoice(): InvoiceDto {
     invoiceTypeCode: '380',
     currencyCode: 'EUR',
     dueDate: '2024-07-20',
+    deliveryDate: '2024-06-20',
     seller: {
       name: 'XML Seller GmbH', street: 'Str 1', city: 'Berlin',
       postalCode: '10115', countryCode: 'DE', vatId: 'DE111111111',
@@ -37,99 +38,161 @@ function sampleInvoice(): InvoiceDto {
   };
 }
 
-describe('XRechnungXmlService', () => {
+describe('XRechnungXmlService — CII format', () => {
   const service = new XRechnungXmlService();
 
-  it('should generate valid UBL 2.1 XML', () => {
+  it('generates CII (CrossIndustryInvoice) root element', () => {
     const xml = service.generate(sampleInvoice());
-
     expect(xml).toContain('<?xml version="1.0" encoding="UTF-8"?>');
-    expect(xml).toContain('xmlns:ubl="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"');
-    expect(xml).toContain('xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"');
-    expect(xml).toContain('xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"');
+    expect(xml).toContain('rsm:CrossIndustryInvoice');
+    expect(xml).toContain('xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"');
+    expect(xml).toContain('xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"');
+    expect(xml).toContain('xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100"');
   });
 
-  it('should contain XRechnung CustomizationID', () => {
+  it('contains Factur-X XRECHNUNG customization ID', () => {
     const xml = service.generate(sampleInvoice());
-    expect(xml).toContain('urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0');
+    expect(xml).toContain(
+      'urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3' +
+      '#conformant#urn:factur-x.eu:1p0:xrechnung',
+    );
   });
 
-  it('should contain invoice header fields', () => {
+  it('contains invoice header fields in CII format', () => {
     const xml = service.generate(sampleInvoice());
-    expect(xml).toContain('<cbc:ID>XML-001</cbc:ID>');
-    expect(xml).toContain('<cbc:IssueDate>2024-06-20</cbc:IssueDate>');
-    expect(xml).toContain('<cbc:DueDate>2024-07-20</cbc:DueDate>');
-    expect(xml).toContain('<cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>');
-    expect(xml).toContain('<cbc:DocumentCurrencyCode>EUR</cbc:DocumentCurrencyCode>');
+    expect(xml).toContain('<ram:ID>XML-001</ram:ID>');
+    expect(xml).toContain('<ram:TypeCode>380</ram:TypeCode>');
+    // CII dates use format="102" with no dashes: YYYYMMDD
+    expect(xml).toContain('<udt:DateTimeString format="102">20240620</udt:DateTimeString>');
+    expect(xml).toContain('<ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>');
   });
 
-  it('should contain seller and buyer parties', () => {
+  it('formats dates as YYYYMMDD (format 102) — no ISO dashes', () => {
     const xml = service.generate(sampleInvoice());
-    expect(xml).toContain('<cbc:RegistrationName>XML Seller GmbH</cbc:RegistrationName>');
-    expect(xml).toContain('<cbc:RegistrationName>XML Buyer AG</cbc:RegistrationName>');
-    expect(xml).toContain('<cbc:CompanyID>DE111111111</cbc:CompanyID>');
+    // No ISO-style dates should appear (YYYY-MM-DD)
+    expect(xml).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    // CII format-102 dates should be present
+    expect(xml).toContain('format="102"');
   });
 
-  it('should contain payment information', () => {
+  it('contains seller and buyer parties in CII structure', () => {
     const xml = service.generate(sampleInvoice());
-    expect(xml).toContain('<cbc:PaymentMeansCode>58</cbc:PaymentMeansCode>');
-    expect(xml).toContain('DE89370400440532013000');
-    expect(xml).toContain('COBADEFFXXX');
-    expect(xml).toContain('Net 30 days');
+    expect(xml).toContain('<ram:SellerTradeParty>');
+    expect(xml).toContain('<ram:BuyerTradeParty>');
+    expect(xml).toContain('<ram:Name>XML Seller GmbH</ram:Name>');
+    expect(xml).toContain('<ram:Name>XML Buyer AG</ram:Name>');
   });
 
-  it('should contain tax and monetary totals', () => {
+  it('contains seller postal address', () => {
     const xml = service.generate(sampleInvoice());
-    expect(xml).toContain('<cbc:TaxAmount currencyID="EUR">19.00</cbc:TaxAmount>');
-    expect(xml).toContain('<cbc:LineExtensionAmount currencyID="EUR">100.00</cbc:LineExtensionAmount>');
-    expect(xml).toContain('<cbc:PayableAmount currencyID="EUR">119.00</cbc:PayableAmount>');
+    expect(xml).toContain('<ram:PostalTradeAddress>');
+    expect(xml).toContain('<ram:PostcodeCode>10115</ram:PostcodeCode>');
+    expect(xml).toContain('<ram:LineOne>Str 1</ram:LineOne>');
+    expect(xml).toContain('<ram:CityName>Berlin</ram:CityName>');
+    expect(xml).toContain('<ram:CountryID>DE</ram:CountryID>');
   });
 
-  it('should contain line items', () => {
+  it('contains seller VAT ID in SpecifiedTaxRegistration (BT-31)', () => {
     const xml = service.generate(sampleInvoice());
-    expect(xml).toContain('<cbc:InvoicedQuantity unitCode="C62">2</cbc:InvoicedQuantity>');
-    expect(xml).toContain('<cbc:Name>Widget</cbc:Name>');
-    expect(xml).toContain('<cbc:PriceAmount currencyID="EUR">50.00</cbc:PriceAmount>');
+    expect(xml).toContain('<ram:ID schemeID="VA">DE111111111</ram:ID>');
   });
 
-  it('should include §19 UStG note for Kleinunternehmer', () => {
-    const inv = { ...sampleInvoice(), kleinunternehmer: true, taxCategoryCode: 'E', taxRate: 0, totalTaxAmount: 0, totalGrossAmount: 100, amountDue: 100 };
+  it('BT-42 — emits TelephoneUniversalCommunication only when phone is non-empty', () => {
+    const xml = service.generate(sampleInvoice());
+    expect(xml).toContain('<ram:TelephoneUniversalCommunication>');
+    expect(xml).toContain('<ram:CompleteNumber>+49123</ram:CompleteNumber>');
+
+    // Empty phone → element must be absent
+    const inv = sampleInvoice();
+    inv.seller.contactPhone = '';
+    const xmlNoPhone = service.generate(inv);
+    expect(xmlNoPhone).not.toContain('<ram:TelephoneUniversalCommunication>');
+  });
+
+  it('BT-72 — ActualDeliveryDate present when deliveryDate is set', () => {
+    const xml = service.generate(sampleInvoice());
+    expect(xml).toContain('<ram:ActualDeliverySupplyChainEvent>');
+    // delivery date 2024-06-20 → 20240620
+    expect(xml).toContain('<udt:DateTimeString format="102">20240620</udt:DateTimeString>');
+  });
+
+  it('BT-72 — falls back to invoiceDate when deliveryDate is absent', () => {
+    const inv = sampleInvoice();
+    delete inv.deliveryDate;
+    const xml = service.generate(inv);
+    expect(xml).toContain('<ram:ActualDeliverySupplyChainEvent>');
+    // invoice date 2024-06-20 is used as fallback
+    expect(xml).toContain('<udt:DateTimeString format="102">20240620</udt:DateTimeString>');
+  });
+
+  it('contains payment information in CII structure', () => {
+    const xml = service.generate(sampleInvoice());
+    expect(xml).toContain('<ram:SpecifiedTradeSettlementPaymentMeans>');
+    expect(xml).toContain('<ram:TypeCode>58</ram:TypeCode>');
+    expect(xml).toContain('<ram:IBANID>DE89370400440532013000</ram:IBANID>');
+    expect(xml).toContain('<ram:BICID>COBADEFFXXX</ram:BICID>');
+  });
+
+  it('contains payment terms and due date', () => {
+    const xml = service.generate(sampleInvoice());
+    expect(xml).toContain('<ram:Description>Net 30 days</ram:Description>');
+    // due date 2024-07-20 → 20240720
+    expect(xml).toContain('<udt:DateTimeString format="102">20240720</udt:DateTimeString>');
+  });
+
+  it('contains tax and monetary totals in CII structure', () => {
+    const xml = service.generate(sampleInvoice());
+    expect(xml).toContain('<ram:CalculatedAmount>19.00</ram:CalculatedAmount>');
+    expect(xml).toContain('<ram:TaxBasisTotalAmount>100.00</ram:TaxBasisTotalAmount>');
+    expect(xml).toContain('<ram:TaxTotalAmount currencyID="EUR">19.00</ram:TaxTotalAmount>');
+    expect(xml).toContain('<ram:GrandTotalAmount>119.00</ram:GrandTotalAmount>');
+    expect(xml).toContain('<ram:DuePayableAmount>119.00</ram:DuePayableAmount>');
+  });
+
+  it('contains line items in CII structure', () => {
+    const xml = service.generate(sampleInvoice());
+    expect(xml).toContain('<ram:IncludedSupplyChainTradeLineItem>');
+    expect(xml).toContain('<ram:BilledQuantity unitCode="C62">2</ram:BilledQuantity>');
+    expect(xml).toContain('<ram:Name>Widget</ram:Name>');
+    expect(xml).toContain('<ram:ChargeAmount>50.00</ram:ChargeAmount>');
+    expect(xml).toContain('<ram:LineTotalAmount>100.00</ram:LineTotalAmount>');
+  });
+
+  it('Kleinunternehmer — includes §19 exemption note and ExemptionReasonCode', () => {
+    const inv = {
+      ...sampleInvoice(),
+      kleinunternehmer: true,
+      taxCategoryCode: 'E',
+      taxRate: 0,
+      totalTaxAmount: 0,
+      totalGrossAmount: 100,
+      amountDue: 100,
+      lines: [{ ...sampleInvoice().lines[0], vatCategoryCode: 'E', vatRate: 0 }],
+    };
     const xml = service.generate(inv);
     expect(xml).toContain('§19 UStG');
-    expect(xml).toContain('<cbc:TaxExemptionReasonCode>vatex-eu-132-1b</cbc:TaxExemptionReasonCode>');
-    expect(xml).toContain('<cbc:ID>E</cbc:ID>');
+    expect(xml).toContain('<ram:ExemptionReasonCode>vatex-eu-132-1b</ram:ExemptionReasonCode>');
+    expect(xml).toContain('<ram:CategoryCode>E</ram:CategoryCode>');
   });
 
-  it('should NOT include §19 note for regular invoices', () => {
+  it('Kleinunternehmer — no ExemptionReasonCode for regular invoices', () => {
     const xml = service.generate(sampleInvoice());
     expect(xml).not.toContain('§19 UStG');
-    expect(xml).not.toContain('TaxExemptionReasonCode');
+    expect(xml).not.toContain('ExemptionReasonCode');
   });
 
-  it('should contain BT-30 CompanyID in PartyLegalEntity (BR-CO-26)', () => {
-    const xml = service.generate(sampleInvoice());
-    // BT-30 should appear inside PartyLegalEntity (after RegistrationName)
-    const legalEntityMatch = xml.match(/<cac:PartyLegalEntity>[\s\S]*?<\/cac:PartyLegalEntity>/g);
-    expect(legalEntityMatch).toBeTruthy();
-    // Seller's PartyLegalEntity should contain CompanyID
-    const sellerLegal = legalEntityMatch![0];
-    expect(sellerLegal).toContain('<cbc:CompanyID>DE111111111</cbc:CompanyID>');
-  });
-
-  it('should use taxNumber as BT-30 when vatId is absent (BR-CO-26)', () => {
+  it('uses taxNumber as BT-32 (FC scheme) when provided', () => {
     const inv = sampleInvoice();
-    inv.seller.vatId = undefined;
     inv.seller.taxNumber = '123/456/78901';
     const xml = service.generate(inv);
-    const legalEntityMatch = xml.match(/<cac:PartyLegalEntity>[\s\S]*?<\/cac:PartyLegalEntity>/g);
-    const sellerLegal = legalEntityMatch![0];
-    expect(sellerLegal).toContain('<cbc:CompanyID>123/456/78901</cbc:CompanyID>');
+    expect(xml).toContain('<ram:ID schemeID="FC">123/456/78901</ram:ID>');
   });
 
-  it('should contain seller contact', () => {
+  it('does NOT produce UBL elements (no cbc: or cac: prefixes)', () => {
     const xml = service.generate(sampleInvoice());
-    expect(xml).toContain('<cbc:Name>Max</cbc:Name>');
-    expect(xml).toContain('<cbc:Telephone>+49123</cbc:Telephone>');
-    expect(xml).toContain('<cbc:ElectronicMail>max@example.com</cbc:ElectronicMail>');
+    expect(xml).not.toContain('xmlns:cbc=');
+    expect(xml).not.toContain('xmlns:cac=');
+    expect(xml).not.toContain('xmlns:ubl=');
+    expect(xml).not.toContain('ubl:Invoice');
   });
 });

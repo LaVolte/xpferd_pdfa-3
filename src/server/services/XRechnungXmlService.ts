@@ -2,206 +2,235 @@ import { create } from 'xmlbuilder2';
 import type { InvoiceDto } from '../../shared/types';
 import { KLEINUNTERNEHMER_NOTE } from '../../shared/constants/index.js';
 
+/**
+ * Generates a ZUGFeRD 2.3 / Factur-X 1.0 compliant CII (Cross Industry Invoice)
+ * XML document in the XRECHNUNG profile.
+ *
+ * Syntax: UN/CEFACT Cross Industry Invoice 100
+ * Profile: urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3
+ *          #conformant#urn:factur-x.eu:1p0:xrechnung
+ * Attachment filename: factur-x.xml (required by Factur-X spec §6)
+ */
 export class XRechnungXmlService {
   private static readonly CUSTOMIZATION_ID =
-    'urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0';
-  private static readonly PROFILE_ID =
-    'urn:fdc:peppol.eu:2017:poacc:billing:01:1.0';
+    'urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_2.3' +
+    '#conformant#urn:factur-x.eu:1p0:xrechnung';
 
   generate(invoice: InvoiceDto): string {
-    const doc = create({ version: '1.0', encoding: 'UTF-8' })
-      .ele('ubl:Invoice', {
-        'xmlns:ubl': 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2',
-        'xmlns:cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
-        'xmlns:cbc': 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
+    const root = create({ version: '1.0', encoding: 'UTF-8' })
+      .ele('rsm:CrossIndustryInvoice', {
+        'xmlns:rsm': 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100',
+        'xmlns:ram': 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100',
+        'xmlns:udt': 'urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100',
+        'xmlns:qdt': 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100',
       });
 
-    doc.ele('cbc:CustomizationID').txt(XRechnungXmlService.CUSTOMIZATION_ID);
-    doc.ele('cbc:ProfileID').txt(XRechnungXmlService.PROFILE_ID);
-    doc.ele('cbc:ID').txt(invoice.invoiceNumber);
-    doc.ele('cbc:IssueDate').txt(invoice.invoiceDate);
-    if (invoice.dueDate) {
-      doc.ele('cbc:DueDate').txt(invoice.dueDate);
-    }
-    doc.ele('cbc:InvoiceTypeCode').txt(invoice.invoiceTypeCode);
+    // ── 1. ExchangedDocumentContext ───────────────────────────────────────────
+    root.ele('rsm:ExchangedDocumentContext')
+      .ele('ram:GuidelineSpecifiedDocumentContextParameter')
+      .ele('ram:ID').txt(XRechnungXmlService.CUSTOMIZATION_ID);
 
-    // Kleinunternehmer note (BT-22) — must appear before DocumentCurrencyCode per UBL 2.1
+    // ── 2. ExchangedDocument (header) ─────────────────────────────────────────
+    const doc = root.ele('rsm:ExchangedDocument');
+    doc.ele('ram:ID').txt(invoice.invoiceNumber);
+    doc.ele('ram:TypeCode').txt(invoice.invoiceTypeCode);
+    doc.ele('ram:IssueDateTime')
+      .ele('udt:DateTimeString', { format: '102' }).txt(this.ciiDate(invoice.invoiceDate));
+
+    // Note (BT-22) — Kleinunternehmer or free text
     if (invoice.kleinunternehmer) {
-      doc.ele('cbc:Note').txt(KLEINUNTERNEHMER_NOTE);
+      doc.ele('ram:IncludedNote').ele('ram:Content').txt(KLEINUNTERNEHMER_NOTE);
+    } else if (invoice.note) {
+      doc.ele('ram:IncludedNote').ele('ram:Content').txt(invoice.note);
     }
 
-    // General invoice note (BT-22)
-    if (invoice.note && !invoice.kleinunternehmer) {
-      doc.ele('cbc:Note').txt(invoice.note);
+    // ── 3. SupplyChainTradeTransaction ────────────────────────────────────────
+    const tx = root.ele('rsm:SupplyChainTradeTransaction');
+
+    // 3a. Line items (BG-25) — must come first per CII schema order
+    for (const line of invoice.lines) {
+      const li = tx.ele('ram:IncludedSupplyChainTradeLineItem');
+
+      li.ele('ram:AssociatedDocumentLineDocument')
+        .ele('ram:LineID').txt(String(line.lineNumber));
+
+      const product = li.ele('ram:SpecifiedTradeProduct');
+      if (line.itemDescription) {
+        product.ele('ram:Description').txt(line.itemDescription);
+      }
+      product.ele('ram:Name').txt(line.itemName);
+
+      li.ele('ram:SpecifiedLineTradeAgreement')
+        .ele('ram:NetPriceProductTradePrice')
+        .ele('ram:ChargeAmount').txt(this.fmt(line.netPrice));
+
+      li.ele('ram:SpecifiedLineTradeDelivery')
+        .ele('ram:BilledQuantity', { unitCode: line.unitCode }).txt(String(line.quantity));
+
+      const lineSettlement = li.ele('ram:SpecifiedLineTradeSettlement');
+      const lineTax = lineSettlement.ele('ram:ApplicableTradeTax');
+      lineTax.ele('ram:TypeCode').txt('VAT');
+      lineTax.ele('ram:CategoryCode').txt(line.vatCategoryCode);
+      lineTax.ele('ram:RateApplicablePercent').txt(String(line.vatRate));
+
+      lineSettlement.ele('ram:SpecifiedTradeSettlementLineMonetarySummation')
+        .ele('ram:LineTotalAmount').txt(this.fmt(line.lineNetAmount));
     }
 
-    doc.ele('cbc:DocumentCurrencyCode').txt(invoice.currencyCode);
+    // 3b. Header Trade Agreement
+    const agreement = tx.ele('ram:ApplicableHeaderTradeAgreement');
+    agreement.ele('ram:BuyerReference').txt(invoice.buyerReference || 'n/a');
 
-    // Buyer Reference (BT-10) — mandatory for XRechnung (BR-DE-15)
-    doc.ele('cbc:BuyerReference').txt(invoice.buyerReference || 'n/a');
+    // Seller (BG-4)
+    const seller = agreement.ele('ram:SellerTradeParty');
+    seller.ele('ram:Name').txt(invoice.seller.name);
 
-    // Order Reference (BT-13)
+    // Seller contact (BG-6) — BR-DE-2: mandatory for XRechnung
+    const contact = seller.ele('ram:DefinedTradeContact');
+    contact.ele('ram:PersonName').txt(invoice.seller.contactName || '');
+    // BT-42 — only emit when a non-empty phone is available
+    if (invoice.seller.contactPhone?.trim()) {
+      contact.ele('ram:TelephoneUniversalCommunication')
+        .ele('ram:CompleteNumber').txt(invoice.seller.contactPhone.trim());
+    }
+    if (invoice.seller.contactEmail) {
+      contact.ele('ram:EmailURIUniversalCommunication')
+        .ele('ram:URIID').txt(invoice.seller.contactEmail);
+    }
+
+    this.addPostalAddress(seller, invoice.seller);
+
+    // Seller electronic address (BT-34) — EM scheme = email
+    if (invoice.seller.contactEmail) {
+      seller.ele('ram:URIUniversalCommunication')
+        .ele('ram:URIID', { schemeID: 'EM' }).txt(invoice.seller.contactEmail);
+    }
+
+    // BT-31 VAT ID
+    if (invoice.seller.vatId) {
+      seller.ele('ram:SpecifiedTaxRegistration')
+        .ele('ram:ID', { schemeID: 'VA' }).txt(invoice.seller.vatId);
+    }
+    // BT-32 Tax number (Steuernummer)
+    if (invoice.seller.taxNumber) {
+      seller.ele('ram:SpecifiedTaxRegistration')
+        .ele('ram:ID', { schemeID: 'FC' }).txt(invoice.seller.taxNumber);
+    }
+
+    // Buyer (BG-7)
+    const buyer = agreement.ele('ram:BuyerTradeParty');
+    buyer.ele('ram:Name').txt(invoice.buyer.name);
+    this.addPostalAddress(buyer, invoice.buyer);
+
+    // Buyer electronic address (BT-49)
+    if (invoice.buyer.email) {
+      buyer.ele('ram:URIUniversalCommunication')
+        .ele('ram:URIID', { schemeID: 'EM' }).txt(invoice.buyer.email);
+    }
+
+    // BT-48 Buyer VAT ID
+    if (invoice.buyer.vatId) {
+      buyer.ele('ram:SpecifiedTaxRegistration')
+        .ele('ram:ID', { schemeID: 'VA' }).txt(invoice.buyer.vatId);
+    }
+
+    // BT-13 Order reference
     if (invoice.orderReference) {
-      doc.ele('cac:OrderReference')
-        .ele('cbc:ID').txt(invoice.orderReference);
+      agreement.ele('ram:BuyerOrderReferencedDocument')
+        .ele('ram:IssuerAssignedID').txt(invoice.orderReference);
     }
 
-    // Contract Reference (BT-12)
+    // BT-12 Contract reference
     if (invoice.contractReference) {
-      doc.ele('cac:ContractDocumentReference')
-        .ele('cbc:ID').txt(invoice.contractReference);
+      agreement.ele('ram:ContractReferencedDocument')
+        .ele('ram:IssuerAssignedID').txt(invoice.contractReference);
     }
 
-    // Seller (AccountingSupplierParty)
-    this.addParty(doc, 'cac:AccountingSupplierParty', invoice.seller, true);
+    // 3c. Header Trade Delivery
+    // BT-72 ActualDeliveryDate — mandatory for XRechnung (BR-DE-6).
+    // Fall back to invoice issue date when no explicit delivery date is set.
+    const deliveryDate = invoice.deliveryDate || invoice.invoiceDate;
+    tx.ele('ram:ApplicableHeaderTradeDelivery')
+      .ele('ram:ActualDeliverySupplyChainEvent')
+      .ele('ram:OccurrenceDateTime')
+      .ele('udt:DateTimeString', { format: '102' }).txt(this.ciiDate(deliveryDate));
 
-    // Buyer (AccountingCustomerParty)
-    this.addParty(doc, 'cac:AccountingCustomerParty', invoice.buyer, false);
+    // 3d. Header Trade Settlement
+    const settlement = tx.ele('ram:ApplicableHeaderTradeSettlement');
 
-    // Delivery (BG-13) — Actual delivery date (BT-72)
-    if (invoice.deliveryDate) {
-      doc.ele('cac:Delivery')
-        .ele('cbc:ActualDeliveryDate').txt(invoice.deliveryDate);
-    }
-
-    // Payment Means (BG-16)
-    const paymentMeans = doc.ele('cac:PaymentMeans');
-    paymentMeans.ele('cbc:PaymentMeansCode').txt(invoice.paymentMeansCode);
     if (invoice.paymentReference) {
-      paymentMeans.ele('cbc:PaymentID').txt(invoice.paymentReference);
+      settlement.ele('ram:PaymentReference').txt(invoice.paymentReference);
     }
+    settlement.ele('ram:InvoiceCurrencyCode').txt(invoice.currencyCode);
+
+    // Payment means (BG-16)
+    const paymentMeans = settlement.ele('ram:SpecifiedTradeSettlementPaymentMeans');
+    paymentMeans.ele('ram:TypeCode').txt(invoice.paymentMeansCode);
     if (invoice.iban) {
-      const payeeAccount = paymentMeans.ele('cac:PayeeFinancialAccount');
-      payeeAccount.ele('cbc:ID').txt(invoice.iban);
+      const creditorAccount = paymentMeans.ele('ram:PayeePartyCreditorFinancialAccount');
+      creditorAccount.ele('ram:IBANID').txt(invoice.iban);
       if (invoice.accountName) {
-        payeeAccount.ele('cbc:Name').txt(invoice.accountName);
+        creditorAccount.ele('ram:AccountName').txt(invoice.accountName);
       }
       if (invoice.bic) {
-        payeeAccount.ele('cac:FinancialInstitutionBranch')
-          .ele('cbc:ID').txt(invoice.bic);
+        paymentMeans.ele('ram:PayeeSpecifiedCreditorFinancialInstitution')
+          .ele('ram:BICID').txt(invoice.bic);
       }
     }
 
-    // Payment Terms (BT-20)
-    if (invoice.paymentTerms) {
-      doc.ele('cac:PaymentTerms')
-        .ele('cbc:Note').txt(invoice.paymentTerms);
-    }
-
-    // Tax Total (BG-23)
-    const taxTotal = doc.ele('cac:TaxTotal');
-    taxTotal.ele('cbc:TaxAmount', { currencyID: invoice.currencyCode })
-      .txt(this.fmt(invoice.totalTaxAmount ?? 0));
-
-    const taxSubtotal = taxTotal.ele('cac:TaxSubtotal');
-    taxSubtotal.ele('cbc:TaxableAmount', { currencyID: invoice.currencyCode })
-      .txt(this.fmt(invoice.totalNetAmount ?? 0));
-    taxSubtotal.ele('cbc:TaxAmount', { currencyID: invoice.currencyCode })
-      .txt(this.fmt(invoice.totalTaxAmount ?? 0));
-
-    const taxCategory = taxSubtotal.ele('cac:TaxCategory');
-    taxCategory.ele('cbc:ID').txt(invoice.taxCategoryCode);
-    taxCategory.ele('cbc:Percent').txt(String(invoice.taxRate));
+    // Tax (BG-23)
+    const tax = settlement.ele('ram:ApplicableTradeTax');
+    tax.ele('ram:CalculatedAmount').txt(this.fmt(invoice.totalTaxAmount ?? 0));
+    tax.ele('ram:TypeCode').txt('VAT');
     if (invoice.kleinunternehmer) {
-      taxCategory.ele('cbc:TaxExemptionReasonCode').txt('vatex-eu-132-1b');
-      taxCategory.ele('cbc:TaxExemptionReason').txt(KLEINUNTERNEHMER_NOTE);
+      tax.ele('ram:ExemptionReason').txt(KLEINUNTERNEHMER_NOTE);
+      tax.ele('ram:ExemptionReasonCode').txt('vatex-eu-132-1b');
     }
-    taxCategory.ele('cac:TaxScheme').ele('cbc:ID').txt('VAT');
+    tax.ele('ram:BasisAmount').txt(this.fmt(invoice.totalNetAmount ?? 0));
+    tax.ele('ram:CategoryCode').txt(invoice.taxCategoryCode);
+    tax.ele('ram:RateApplicablePercent').txt(String(invoice.taxRate));
 
-    // Legal Monetary Total (BG-22)
-    const monetaryTotal = doc.ele('cac:LegalMonetaryTotal');
-    monetaryTotal.ele('cbc:LineExtensionAmount', { currencyID: invoice.currencyCode })
-      .txt(this.fmt(invoice.totalNetAmount ?? 0));
-    monetaryTotal.ele('cbc:TaxExclusiveAmount', { currencyID: invoice.currencyCode })
-      .txt(this.fmt(invoice.totalNetAmount ?? 0));
-    monetaryTotal.ele('cbc:TaxInclusiveAmount', { currencyID: invoice.currencyCode })
-      .txt(this.fmt(invoice.totalGrossAmount ?? 0));
-    if (invoice.prepaidAmount && invoice.prepaidAmount > 0) {
-      monetaryTotal.ele('cbc:PrepaidAmount', { currencyID: invoice.currencyCode })
-        .txt(this.fmt(invoice.prepaidAmount));
-    }
-    monetaryTotal.ele('cbc:PayableAmount', { currencyID: invoice.currencyCode })
-      .txt(this.fmt(invoice.amountDue ?? 0));
-
-    // Invoice Lines (BG-25)
-    for (const line of invoice.lines) {
-      const invLine = doc.ele('cac:InvoiceLine');
-      invLine.ele('cbc:ID').txt(String(line.lineNumber));
-      invLine.ele('cbc:InvoicedQuantity', { unitCode: line.unitCode })
-        .txt(String(line.quantity));
-      invLine.ele('cbc:LineExtensionAmount', { currencyID: invoice.currencyCode })
-        .txt(this.fmt(line.lineNetAmount));
-
-      const item = invLine.ele('cac:Item');
-      if (line.itemDescription) {
-        item.ele('cbc:Description').txt(line.itemDescription);
+    // Payment terms (BT-20)
+    if (invoice.paymentTerms || invoice.dueDate) {
+      const terms = settlement.ele('ram:SpecifiedTradePaymentTerms');
+      if (invoice.paymentTerms) {
+        terms.ele('ram:Description').txt(invoice.paymentTerms);
       }
-      item.ele('cbc:Name').txt(line.itemName);
-      const classifiedTax = item.ele('cac:ClassifiedTaxCategory');
-      classifiedTax.ele('cbc:ID').txt(line.vatCategoryCode);
-      classifiedTax.ele('cbc:Percent').txt(String(line.vatRate));
-      classifiedTax.ele('cac:TaxScheme').ele('cbc:ID').txt('VAT');
-
-      const price = invLine.ele('cac:Price');
-      price.ele('cbc:PriceAmount', { currencyID: invoice.currencyCode })
-        .txt(this.fmt(line.netPrice));
+      if (invoice.dueDate) {
+        terms.ele('ram:DueDateDateTime')
+          .ele('udt:DateTimeString', { format: '102' }).txt(this.ciiDate(invoice.dueDate));
+      }
     }
 
-    return doc.end({ prettyPrint: true });
+    // Monetary totals (BG-22)
+    const totals = settlement.ele('ram:SpecifiedTradeSettlementHeaderMonetarySummation');
+    totals.ele('ram:LineTotalAmount').txt(this.fmt(invoice.totalNetAmount ?? 0));
+    totals.ele('ram:TaxBasisTotalAmount').txt(this.fmt(invoice.totalNetAmount ?? 0));
+    totals.ele('ram:TaxTotalAmount', { currencyID: invoice.currencyCode })
+      .txt(this.fmt(invoice.totalTaxAmount ?? 0));
+    totals.ele('ram:GrandTotalAmount').txt(this.fmt(invoice.totalGrossAmount ?? 0));
+    if (invoice.prepaidAmount && invoice.prepaidAmount > 0) {
+      totals.ele('ram:TotalPrepaidAmount').txt(this.fmt(invoice.prepaidAmount));
+    }
+    totals.ele('ram:DuePayableAmount').txt(this.fmt(invoice.amountDue ?? 0));
+
+    return root.end({ prettyPrint: true });
   }
 
-  private addParty(
-    parent: ReturnType<typeof create>,
-    tagName: string,
-    party: { name: string; street: string; city: string; postalCode: string; countryCode: string; vatId?: string; taxNumber?: string; contactName?: string; contactPhone?: string; contactEmail?: string; email?: string },
-    isSeller: boolean,
+  private addPostalAddress(
+    party: ReturnType<typeof create>,
+    address: { street: string; city: string; postalCode: string; countryCode: string },
   ): void {
-    const wrapper = (parent as any).ele(tagName);
-    const partyEl = wrapper.ele('cac:Party');
+    const addr = (party as any).ele('ram:PostalTradeAddress');
+    addr.ele('ram:PostcodeCode').txt(address.postalCode);
+    addr.ele('ram:LineOne').txt(address.street);
+    addr.ele('ram:CityName').txt(address.city);
+    addr.ele('ram:CountryID').txt(address.countryCode);
+  }
 
-    // EndpointID (BT-34 seller / BT-49 buyer) — mandatory for PEPPOL (R020, R010)
-    const endpointEmail = isSeller ? party.contactEmail : party.email;
-    partyEl.ele('cbc:EndpointID', { schemeID: 'EM' }).txt(endpointEmail || '');
-
-    // Postal Address (BG-5 / BG-8)
-    const address = partyEl.ele('cac:PostalAddress');
-    address.ele('cbc:StreetName').txt(party.street);
-    address.ele('cbc:CityName').txt(party.city);
-    address.ele('cbc:PostalZone').txt(party.postalCode);
-    address.ele('cac:Country').ele('cbc:IdentificationCode').txt(party.countryCode);
-
-    // VAT Registration — BT-31 (PartyTaxScheme with VAT scheme)
-    if (party.vatId) {
-      const vatScheme = partyEl.ele('cac:PartyTaxScheme');
-      vatScheme.ele('cbc:CompanyID').txt(party.vatId);
-      vatScheme.ele('cac:TaxScheme').ele('cbc:ID').txt('VAT');
-    }
-
-    // Tax Registration — BT-32 (PartyTaxScheme with FC scheme, for Steuernummer)
-    if (isSeller && party.taxNumber) {
-      const taxScheme = partyEl.ele('cac:PartyTaxScheme');
-      taxScheme.ele('cbc:CompanyID').txt(party.taxNumber);
-      taxScheme.ele('cac:TaxScheme').ele('cbc:ID').txt('FC');
-    }
-
-    // Legal Entity (BT-27 / BT-44)
-    const legalEntity = partyEl.ele('cac:PartyLegalEntity');
-    legalEntity.ele('cbc:RegistrationName').txt(party.name);
-    // BT-30: Seller legal registration identifier — satisfies BR-CO-26
-    if (isSeller) {
-      const companyId = party.vatId || party.taxNumber || '';
-      if (companyId) {
-        legalEntity.ele('cbc:CompanyID').txt(companyId);
-      }
-    }
-
-    // Seller Contact (BG-6) — mandatory for XRechnung (BR-DE-2)
-    if (isSeller) {
-      const contact = partyEl.ele('cac:Contact');
-      contact.ele('cbc:Name').txt(party.contactName || '');
-      contact.ele('cbc:Telephone').txt(party.contactPhone || '');
-      contact.ele('cbc:ElectronicMail').txt(party.contactEmail || '');
-    }
+  /** Convert ISO date (YYYY-MM-DD) to CII format 102 (YYYYMMDD). */
+  private ciiDate(iso: string): string {
+    return iso.replace(/-/g, '');
   }
 
   private fmt(n: number): string {
